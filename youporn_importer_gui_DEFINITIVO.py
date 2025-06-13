@@ -139,6 +139,7 @@ def avvia_gui():
     tk.Button(btn_frame, text="Importa Categoria", command=importa_categoria_gui).grid(row=0, column=1, padx=5)
 
     root.mainloop()
+      # Pulsanticiccione
 
 if __name__ == "__main__":
     avvia_gui()
