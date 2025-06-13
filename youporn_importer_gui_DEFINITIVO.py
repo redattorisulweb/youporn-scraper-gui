@@ -1,6 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import csv
+import pandas as pd
 import tkinter as tk
 from tkinter import messagebox, simpledialog
 
@@ -83,6 +84,10 @@ def importa_da_categoria_csv(url_cat, output_csv="categoria_dettagliata.csv", ma
             writer.writerow(item)
     print(f"[FINE] Estratti {len(lista)} video in {output_csv}")
 
+def export_to_excel(data, path):
+    df = pd.DataFrame(data)
+    df.to_excel(path, index=False)
+
 def avvia_gui():
     root = tk.Tk()
     root.title("Importatore YouPorn")
@@ -129,8 +134,8 @@ def avvia_gui():
                 f"{v['durata']} | {v['views']} views | {v['rating']}\n"
             )
             output.insert(tk.END, line)
-        importa_da_categoria_csv(url, max_video=n)
-        messagebox.showinfo("Importa", f"Salvati {len(lista)} video in categoria_dettagliata.csv")
+        export_to_excel(lista, "categoria_dettagliata.xlsx")
+        messagebox.showinfo("Importa", f"Salvati {len(lista)} video in categoria_dettagliata.xlsx")
 
     # Pulsanti
     btn_frame = tk.Frame(root)
