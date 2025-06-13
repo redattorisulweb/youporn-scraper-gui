@@ -1,6 +1,12 @@
 import requests
 from bs4 import BeautifulSoup
 import csv
+from typing import Callable, List, Dict
+
+try:
+    from openpyxl import Workbook
+except Exception:
+    Workbook = None  # type: ignore
 import tkinter as tk
 from tkinter import messagebox, simpledialog
 
@@ -83,6 +89,35 @@ def importa_da_categoria_csv(url_cat, output_csv="categoria_dettagliata.csv", ma
             writer.writerow(item)
     print(f"[FINE] Estratti {len(lista)} video in {output_csv}")
 
+def estrai_info_da_categoria_multi(url_cat: str, pages: int, progress: Callable[[str], None] | None = None) -> List[Dict]:
+    risultati: List[Dict] = []
+    base = url_cat.split('?')[0].rstrip('/')
+    for p in range(1, pages + 1):
+        page_url = url_cat if p == 1 else f"{base}?page={p}"
+        if progress:
+            progress(f"[INFO] Pagina {p}: {page_url}\n")
+        page_ris = estrai_info_da_categoria(page_url)
+        for idx, v in enumerate(page_ris, start=1):
+            if progress:
+                progress(f"  {idx}. {v.get('titolo')}\n")
+        risultati.extend(page_ris)
+    return risultati
+
+def salva_excel(lista: List[Dict], output_file: str = "categoria_dettagliata.xlsx") -> None:
+    if Workbook is None:
+        raise RuntimeError("openpyxl non disponibile")
+    wb = Workbook()
+    ws = wb.active
+    headers = [
+        'video_id','uploader_id','uploader_type','uploader_name',
+        'titolo','video_page_url','thumbnail_url','video_direct_url',
+        'durata','views','rating'
+    ]
+    ws.append(headers)
+    for item in lista:
+        ws.append([item.get(h) for h in headers])
+    wb.save(output_file)
+
 def avvia_gui():
     root = tk.Tk()
     root.title("Importatore YouPorn")
@@ -117,20 +152,33 @@ def avvia_gui():
         if not url:
             messagebox.showerror("Errore", "Inserisci l'URL di una categoria.")
             return
-        n = simpledialog.askinteger("Numero video", "Quanti video importare?", initialvalue=10, minvalue=1, maxvalue=100)
-        if n is None:
+
+        pagine = simpledialog.askinteger(
+            "Numero pagine", "Quante pagine importare?",
+            initialvalue=1, minvalue=1, maxvalue=20
+        )
+        if pagine is None:
             return
+
         output.delete(1.0, tk.END)
-        output.insert(tk.END, "[INFO] Avvio estrazione da: " + url + "\n")
-        lista = estrai_info_da_categoria(url, n)
-        for idx, v in enumerate(lista, start=1):
-            line = (
-                f"{idx}. {v['titolo']} | {v['thumbnail_url']} | {v['video_direct_url']} | "
-                f"{v['durata']} | {v['views']} views | {v['rating']}\n"
+
+        def log(msg: str) -> None:
+            output.insert(tk.END, msg)
+            output.see(tk.END)
+            root.update_idletasks()
+
+        log(f"[INFO] Avvio estrazione da: {url}\n")
+        lista = estrai_info_da_categoria_multi(url, pagine, progress=log)
+
+        try:
+            salva_excel(lista)
+            log("[INFO] File Excel salvato in categoria_dettagliata.xlsx\n")
+            messagebox.showinfo(
+                "Importa",
+                f"Salvati {len(lista)} video in categoria_dettagliata.xlsx"
             )
-            output.insert(tk.END, line)
-        importa_da_categoria_csv(url, max_video=n)
-        messagebox.showinfo("Importa", f"Salvati {len(lista)} video in categoria_dettagliata.csv")
+        except Exception as e:
+            messagebox.showerror("Errore", f"Impossibile salvare Excel: {e}")
 
     # Pulsanti
     btn_frame = tk.Frame(root)
